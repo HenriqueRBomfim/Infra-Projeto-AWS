@@ -2,102 +2,107 @@
 # Log de execução do user_data
 exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
-echo ">>> Iniciando user_data_backend.sh para API FastAPI"
+echo ">>> Iniciando user_data_backend.sh para API FastAPI com PostgreSQL RDS"
 
 # Variáveis (serão injetadas pelo template_file do Terraform)
 REPO_URL="${backend_repo_url}"
-APP_PORT="${backend_app_port}" # Porta em que o Gunicorn/Uvicorn vai escutar
-AWS_REGION_FOR_CLI="${aws_region}" # Região para AWS CLI, se usada para Secrets Manager
-# DB_CONNECTION_SECRET_NAME="${db_connection_secret_name}" # Descomente se for buscar do Secrets Manager
+APP_PORT="${backend_app_port}"
+AWS_REGION_FOR_CLI="${aws_region}"
+DB_CREDENTIALS_SECRET_NAME="${db_credentials_secret_name_postgres}"
+BACKEND_REPO_BRANCH="${backend_repo_branch}"
 
 APP_DIR="/srv/backend-app"
 VENV_DIR="$APP_DIR/venv"
 
 echo ">>> Atualizando pacotes e instalando dependências base"
 sudo apt update -y
-sudo apt install -y git python3 python3-pip python3-venv # Nginx não é estritamente necessário para o backend API se Gunicorn escutar em 0.0.0.0
+# jq é útil para parsear o JSON do Secrets Manager
+sudo apt install -y git python3 python3-pip python3-venv jq 
 
-echo ">>> Clonando o repositório backend"
-sudo git clone "$REPO_URL" "$APP_DIR"
+echo ">>> Clonando o repositório backend ($REPO_URL) da branch ($BACKEND_REPO_BRANCH)"
+if [ -n "$BACKEND_REPO_BRANCH" ]; then
+  sudo git clone --branch "$BACKEND_REPO_BRANCH" "$REPO_URL" "$APP_DIR"
+else
+  # Fallback para clonar a branch default se BACKEND_REPO_BRANCH não for fornecida
+  echo "AVISO: Nome da branch não fornecido, clonando a branch padrão."
+  sudo git clone "$REPO_URL" "$APP_DIR"
+fi
+# Verifica se o clone foi bem-sucedido
+if [ ! -d "$APP_DIR/.git" ]; then
+    echo "ERRO CRÍTICO: Falha ao clonar o repositório backend. Verifique URL e nome da branch."
+    exit 1
+fi
 cd "$APP_DIR"
 
 echo ">>> Configurando ambiente virtual Python"
 sudo python3 -m venv "$VENV_DIR"
-# source "$VENV_DIR/bin/activate" # Ativa o venv para este script - cuidado com sudo depois disso
 
-echo ">>> Instalando dependências Python"
+echo ">>> Instalando dependências Python (incluindo psycopg2-binary para PostgreSQL)"
 sudo "$VENV_DIR/bin/pip" install --upgrade pip
-sudo "$VENV_DIR/bin/pip" install -r requirements.txt # Garanta que uvicorn e gunicorn estejam no requirements.txt
-                                                 # ou instale-os explicitamente aqui:
-                                                 # sudo "$VENV_DIR/bin/pip" install uvicorn gunicorn
+# Certifique-se que 'psycopg2-binary' (ou 'psycopg2') está no seu requirements.txt
+# ou instale aqui: sudo "$VENV_DIR/bin/pip" install psycopg2-binary
+sudo "$VENV_DIR/bin/pip" install -r requirements.txt 
+sudo "$VENV_DIR/bin/pip" install gunicorn uvicorn # Garante que estão no venv
 
-# --- Configuração do Banco de Dados (USAR AWS SECRETS MANAGER) ---
-echo ">>> Configurando variáveis de ambiente (ex: DATABASE_URL, PORT)"
-# Crie um arquivo .env ou exporte as variáveis diretamente.
-# É AQUI QUE VOCÊ DEVE BUSCAR O SEGREDO DO BANCO DE DADOS DO AWS SECRETS MANAGER
-# E EXPORTAR COMO DATABASE_URL.
-#
-# Exemplo de como buscar e exportar (requer IAM role com permissão e aws_cli instalado):
-#
-# if [ -n "$DB_CONNECTION_SECRET_NAME" ]; then
-#   echo ">>> Buscando DATABASE_URL do AWS Secrets Manager: $DB_CONNECTION_SECRET_NAME em $AWS_REGION_FOR_CLI"
-#   DB_SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id "$DB_CONNECTION_SECRET_NAME" --query SecretString --output text --region "$AWS_REGION_FOR_CLI")
-#   if [ $? -eq 0 ] && [ -n "$DB_SECRET_VALUE" ]; then
-#     # Se o segredo for um JSON contendo a URL (ex: {"DATABASE_URL":"..."}), você precisará parsear com jq
-#     # Se o segredo FOR a própria string da URL, então:
-#     export DATABASE_URL="$DB_SECRET_VALUE"
-#     echo "DATABASE_URL configurada via Secrets Manager."
-#     # Pode ser necessário escrever para um arquivo .env que será lido pelo Gunicorn/Systemd
-#     echo "DATABASE_URL='$DATABASE_URL'" | sudo tee "$APP_DIR/.env" > /dev/null
-#     echo "PORT='$APP_PORT'" | sudo tee -a "$APP_DIR/.env" > /dev/null
-#   else
-#     echo "ERRO: Falha ao buscar DATABASE_URL do Secrets Manager."
-#     # Decida se quer sair com erro ou continuar com uma config padrão (não recomendado para DB)
-#   fi
-# else
-#   echo "AVISO: DB_CONNECTION_SECRET_NAME não fornecido. DATABASE_URL não será configurada via Secrets Manager."
-#   echo "PORT='$APP_PORT'" | sudo tee "$APP_DIR/.env" > /dev/null # Ainda configura a porta
-# fi
-#
-# A aplicação FastAPI deve ser configurada para ler DATABASE_URL do ambiente ou de um arquivo .env
-# Verifique seu config.py ou similar.
+echo ">>> Configurando variáveis de ambiente (DATABASE_URL, PORT) via Secrets Manager"
+DB_ENV_FILE="$APP_DIR/.env" # Arquivo para armazenar as variáveis de ambiente
 
-# Temporário para teste (SUBSTITUA PELA LÓGICA DO SECRETS MANAGER):
-echo "DATABASE_URL='sqlite:///./test.db'" | sudo tee "$APP_DIR/.env" > /dev/null # Exemplo com SQLite, apenas para estrutura. REMOVA E USE SECRETS MANAGER.
-echo "PORT='$APP_PORT'" | sudo tee -a "$APP_DIR/.env" > /dev/null
+if [ -n "$DB_CREDENTIALS_SECRET_NAME" ]; then
+  echo ">>> Buscando credenciais do BD do AWS Secrets Manager: $DB_CREDENTIALS_SECRET_NAME em $AWS_REGION_FOR_CLI"
+  # O IAM Role da instância EC2 deve ter permissão para GetSecretValue neste segredo
+  SECRET_JSON_STRING=$(aws secretsmanager get-secret-value --secret-id "$DB_CREDENTIALS_SECRET_NAME" --query SecretString --output text --region "$AWS_REGION_FOR_CLI")
 
+  if [ $? -eq 0 ] && [ -n "$SECRET_JSON_STRING" ]; then
+    echo "Segredo JSON obtido do Secrets Manager."
+    DB_USER=$(echo "$SECRET_JSON_STRING" | jq -r .username)
+    DB_PASSWORD=$(echo "$SECRET_JSON_STRING" | jq -r .password)
+    DB_HOST=$(echo "$SECRET_JSON_STRING" | jq -r .host)
+    DB_PORT=$(echo "$SECRET_JSON_STRING" | jq -r .port)
+    DB_NAME=$(echo "$SECRET_JSON_STRING" | jq -r .dbname)
+    # DB_ENGINE=$(echo "$SECRET_JSON_STRING" | jq -r .engine) # engine = "postgres"
+
+    # Construir DATABASE_URL para PostgreSQL
+    export DATABASE_URL="postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    # Nota: SQLAlchemy pode preferir 'postgresql+psycopg2://...' ou apenas 'postgresql://...'
+    # Verifique a documentação da sua versão do SQLAlchemy ou o que funciona para sua app.
+    # 'psycopg2' é o nome do driver.
+
+    echo "DATABASE_URL configurada para PostgreSQL via Secrets Manager."
+    echo "DATABASE_URL='$DATABASE_URL'" | sudo tee "$DB_ENV_FILE" > /dev/null
+    echo "PORT='$APP_PORT'" | sudo tee -a "$DB_ENV_FILE" > /dev/null
+    echo "Variáveis de ambiente salvas em $DB_ENV_FILE"
+  else
+    echo "ERRO CRÍTICO: Falha ao buscar credenciais do BD PostgreSQL do Secrets Manager. Verifique permissões IAM e nome do segredo."
+    exit 1 # Sair se não conseguir as credenciais do BD
+  fi
+else
+  echo "ERRO CRÍTICO: Nome do segredo do BD (DB_CREDENTIALS_SECRET_NAME) não fornecido para o script."
+  exit 1
+fi
 
 echo ">>> Executando migrações do Alembic"
-# O Alembic precisa que as variáveis de ambiente (como DATABASE_URL) estejam setadas
-# ou que seu env.py do alembic consiga carregar a configuração da aplicação.
-# Se você exportou DATABASE_URL, o alembic deve pegá-la.
-# Se você escreveu em .env, o Gunicorn/Systemd pode carregar, mas o alembic aqui pode não ver.
-# Uma forma é carregar o .env antes de rodar o alembic se necessário:
-# if [ -f "$APP_DIR/.env" ]; then
-#  export $(echo $(cat "$APP_DIR/.env" | sed 's/#.*//g'| xargs) | envsubst)
-# fi
+# Alembic usará a DATABASE_URL definida no ambiente (se seu env.py estiver configurado para isso)
+# ou lida do .env se sua aplicação (e alembic/env.py) souber carregar de .env.
+# Para garantir que as variáveis do .env estejam disponíveis para o comando alembic:
+if [ -f "$DB_ENV_FILE" ]; then
+  export $(grep -v '^#' "$DB_ENV_FILE" | xargs -d '\n')
+fi
 sudo "$VENV_DIR/bin/alembic" -c "$APP_DIR/alembic.ini" upgrade head
 
 
 echo ">>> Iniciando aplicação FastAPI com Gunicorn/Uvicorn na porta $APP_PORT"
-# Comando para Gunicorn com Uvicorn workers.
-# Ajuste o número de workers (-w) conforme necessário.
-# O módulo é app.main e o objeto da aplicação é app (app.main:app)
-cd "$APP_DIR" # Garante que está no diretório raiz do projeto da API
+cd "$APP_DIR"
 
-# Criar um arquivo de serviço systemd é a melhor abordagem para produção:
 sudo tee /etc/systemd/system/backend-api.service > /dev/null <<EOL
 [Unit]
-Description=Gunicorn instance to serve FastAPI Backend API
+Description=Gunicorn instance to serve FastAPI Backend API (PostgreSQL)
 After=network.target
 
 [Service]
-User=ubuntu # Ou o usuário apropriado que tem acesso ao venv e código
-Group=www-data # Opcional, ou o mesmo grupo do usuário
+User=ubuntu 
+Group=www-data 
 WorkingDirectory=$APP_DIR
-# Se você estiver usando um arquivo .env para carregar variáveis de ambiente:
-EnvironmentFile=$APP_DIR/.env
-# Se não, as variáveis de ambiente precisam ser setadas de outra forma (ex: via próprio systemd Environment=)
+EnvironmentFile=$DB_ENV_FILE # Carrega DATABASE_URL e PORT do arquivo .env
 ExecStart=$VENV_DIR/bin/gunicorn --workers 3 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:\$PORT app.main:app
 Restart=always
 StandardOutput=append:/var/log/backend-api-stdout.log
@@ -111,7 +116,5 @@ echo ">>> Recarregando systemd, habilitando e iniciando o serviço backend-api"
 sudo systemctl daemon-reload
 sudo systemctl enable backend-api.service
 sudo systemctl start backend-api.service
-# Para verificar o status: sudo systemctl status backend-api.service
-# Logs também em /var/log/backend-api-stdout.log e /var/log/backend-api-stderr.log
 
-echo ">>> Script user_data_backend.sh concluído"
+echo ">>> Script user_data_backend.sh (PostgreSQL) concluído"

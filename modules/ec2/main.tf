@@ -1,34 +1,17 @@
-resource "aws_instance" "example" {
-  ami           = var.ami
-  instance_type = var.instance_type
+resource "aws_instance" "app_instance" {
+  ami                         = var.ami
+  instance_type               = var.instance_type
+  key_name                    = var.key_name
+  subnet_id                   = var.subnet_id
+  vpc_security_group_ids      = var.security_group_ids # Usa os SGs passados como variável
+  user_data                   = var.user_data          
+  iam_instance_profile        = var.iam_instance_profile_name # Para a IAM Role
+  associate_public_ip_address = var.associate_public_ip_address
 
-  tags = {
-    Name = var.instance_name
-  }
-}
-
-resource "aws_security_group" "example" {
-  name        = "${var.instance_name}-sg"
-  description = "Allow SSH and HTTP traffic"
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_ips
-  }
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_ips
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  tags = merge(
+    {
+      Name = var.instance_name # O nome principal da instância
+    },
+    var.tags # Permite adicionar tags customizadas passadas pelo módulo raiz
+  )
 }

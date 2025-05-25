@@ -4,40 +4,46 @@ variable "region" {
   default     = "us-east-2"
 }
 
-variable "vpc_cidr" { // Já existe, mas garanta que esteja ok
+variable "vpc_cidr" {
   description = "The CIDR block for the VPC"
   type        = string
   default     = "10.0.0.0/16"
 }
 
-variable "public_subnet_cidrs" { // Usado na chamada do módulo vpc
+variable "public_subnet_cidrs" {
   description = "A list of CIDR blocks for the public subnets"
   type        = list(string)
+  # No default, pois depende das AZs e é crucial para o layout
 }
 
-variable "private_subnet_cidrs" { // Usado na chamada do módulo vpc
+variable "private_subnet_cidrs" {
   description = "A list of CIDR blocks for the private subnets"
   type        = list(string)
+  # No default
 }
 
-variable "availability_zones" { // Usado na chamada do módulo vpc
+variable "availability_zones" {
   description = "A list of availability zones for the subnets"
   type        = list(string)
+  # No default
 }
 
-variable "environment" { // Usado nas chamadas dos módulos
+variable "environment" {
   description = "The deployment environment (e.g., dev, prod)"
   type        = string
+  # No default, geralmente fornecido pelo tfvars
 }
 
-variable "ami_id" { // Para as instâncias EC2
+variable "ami_id" {
   description = "The AMI ID to use for the EC2 instance"
   type        = string
+  # No default, específico da região/OS
 }
 
-variable "key_name" { // Para as instâncias EC2
+variable "key_name" {
   description = "The name of the key pair to use for SSH access"
   type        = string
+  # No default, específico da conta/usuário
 }
 
 variable "instance_type_frontend" {
@@ -55,16 +61,59 @@ variable "instance_type_backend" {
 variable "frontend_repo_url" {
   description = "URL of the frontend Git repository"
   type        = string
+  # No default
 }
 
-variable "backend_repo_url" { // Mesmo que não vá implementar o backend agora, declare
+variable "backend_repo_url" {
   description = "URL of the backend Git repository"
   type        = string
-  default     = "" # Ou um repo placeholder
+  # No default (ou default = "" se você quiser permitir opcionalmente não ter backend)
+}
+
+variable "backend_repo_branch" {
+  description = "A branch do repositório backend a ser clonada na instância EC2"
+  type        = string
+  default     = "main" 
 }
 
 variable "backend_app_port" {
   description = "Port the backend application listens on (for Security Group)"
   type        = number
-  default     = 3000 # Ou a porta padrão do seu backend
+  default     = 8000 # Ajustado para o valor que você está usando no tfvars
+}
+
+variable "db_name_postgres" {
+  description = "Nome inicial do banco de dados PostgreSQL a ser criado no RDS"
+  type        = string
+  default     = "minhaapidb_pg"
+}
+
+variable "db_username_postgres" {
+  description = "Nome de usuário master para o banco de dados PostgreSQL RDS"
+  type        = string
+  default     = "dbadminpg"
+}
+
+variable "db_instance_class_postgres" {
+  description = "Classe da instância para o RDS PostgreSQL (verificar Free Tier)"
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "db_engine_version_postgres" {
+  description = "Versão do motor PostgreSQL para RDS"
+  type        = string
+  default     = "16.2"
+}
+
+variable "db_allocated_storage_postgres" {
+  description = "Armazenamento alocado para o RDS PostgreSQL em GB (mínimo 20 para gp2/gp3)"
+  type        = number
+  default     = 20
+}
+
+variable "db_credentials_secret_name_postgres" {
+  description = "Nome do segredo no AWS Secrets Manager para as credenciais do PostgreSQL RDS"
+  type        = string
+  default     = "app/rds/postgres/credentials"
 }

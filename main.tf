@@ -42,7 +42,7 @@ resource "aws_iam_role_policy_attachment" "ssm_core_policy_attach" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# 4. (Opcional) Anexar a Política para acesso S3 de leitura (se sua app precisar)
+# 4. (Opcional) Anexar a Política para acesso S3 de leitura
 resource "aws_iam_role_policy_attachment" "s3_read_only_policy_attach" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
@@ -67,3 +67,97 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.environment}-ec2-instance-profile" # O nome real do perfil na AWS
   role = aws_iam_role.ec2_role.name
 }
+
+# -----------------------------------------------------------------------------
+# User Data Scripts para Frontend e Backend
+# (Certifique-se que os arquivos .sh existem na raiz do seu projeto Terraform)
+# -----------------------------------------------------------------------------
+
+data "template_file" "frontend_user_data" {
+  template = file("${path.module}/user_data_frontend.sh")
+  vars = {
+    frontend_repo_url = var.frontend_repo_url
+    # Adicione outras variáveis que seu script frontend_user_data.sh possa precisar
+  }
+}
+
+data "template_file" "backend_user_data" {
+  template = file("${path.module}/user_data_backend.sh")
+  vars = {
+    # Chaves à esquerda são como o script user_data as referenciará (ex: ${backend_repo_url})
+    # Valores à direita são as variáveis do Terraform
+    backend_repo_url                  = var.backend_repo_url
+    backend_app_port                  = var.backend_app_port
+    aws_region                        = var.region
+    backend_repo_branch               = var.backend_repo_branch # Passando a branch
+    db_credentials_secret_name_postgres = var.db_credentials_secret_name_postgres # Passando o nome do segredo do PG
+  }
+}
+
+data "aws_iam_policy_document" "read_db_postgres_secret_policy_doc" {
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.db_credentials_postgres.arn] # ARN do segredo PostgreSQL
+    effect    = "Allow"
+  }
+}
+
+resource "aws_iam_policy" "read_db_postgres_secret_policy" {
+  name        = "${var.environment}-read-db-postgres-secret-policy"
+  description = "Permite ler o segredo das credenciais do BD PostgreSQL do Secrets Manager"
+  policy      = data.aws_iam_policy_document.read_db_postgres_secret_policy_doc.json
+}
+
+resource "aws_iam_role_policy_attachment" "read_db_postgres_secret_attach" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.read_db_postgres_secret_policy.arn
+}
+
+# -----------------------------------------------------------------------------
+# Instância EC2 para o Frontend
+# -----------------------------------------------------------------------------
+module "ec2_frontend" {
+  source = "./modules/ec2" # Caminho para o seu módulo EC2
+
+  instance_name               = "${var.environment}-frontend"
+  ami                         = var.ami_id
+  instance_type               = var.instance_type_frontend # Use a variável específica se declarada
+  key_name                    = var.key_name
+  # Coloca a instância na primeira subnet pública disponível
+  subnet_id                   = module.vpc.public_subnet_ids[0]
+  security_group_ids          = [module.security.frontend_sg_id] # ID do SG do frontend
+  user_data                   = data.template_file.frontend_user_data.rendered
+  iam_instance_profile_name   = aws_iam_instance_profile.ec2_profile.name
+  associate_public_ip_address = true # Frontend precisa de IP público
+
+  tags = {
+    Tier        = "Frontend"
+    Project     = "MeuProjetoWebApp" # Exemplo de tag adicional
+    Environment = var.environment
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Instância EC2 para o Backend
+# -----------------------------------------------------------------------------
+module "ec2_backend" {
+  source = "./modules/ec2" # Caminho para o seu módulo EC2
+
+  instance_name               = "${var.environment}-backend"
+  ami                         = var.ami_id
+  instance_type               = var.instance_type_backend # Use a variável específica se declarada
+  key_name                    = var.key_name
+  # Coloca a instância na primeira subnet privada disponível
+  subnet_id                   = module.vpc.private_subnet_ids[0]
+  security_group_ids          = [module.security.backend_sg_id] # ID do SG do backend
+  user_data                   = data.template_file.backend_user_data.rendered
+  iam_instance_profile_name   = aws_iam_instance_profile.ec2_profile.name
+  associate_public_ip_address = false # Backend não precisa de IP público direto
+
+  tags = {
+    Tier        = "Backend"
+    Project     = "MeuProjetoWebApp" # Exemplo de tag adicional
+    Environment = var.environment
+  }
+}
+

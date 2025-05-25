@@ -1,3 +1,5 @@
+# Local: modules/security/variables.tf
+
 variable "vpc_id" {
   description = "The ID of the VPC where the security groups will be created"
   type        = string
@@ -17,7 +19,9 @@ variable "backend_app_port" {
 }
 
 variable "ssh_access_cidr" {
-  description = "CIDR block allowed for SSH access to instances. Be restrictive!"
+  description = "CIDR block list allowed for SSH access if SSH rules are enabled. Be restrictive!"
   type        = list(string)
-  default     = ["0.0.0.0/0"] # AVISO: Permite SSH de qualquer lugar. Restrinja isso em produção!
+  default     = [] # Default para uma lista vazia é mais seguro que 0.0.0.0/0.
+                   # Se as regras SSH estiverem ativas e isso estiver vazio, ninguém acessa via SSH direto.
+                   # O valor real virá do terraform.tfvars se as regras SSH forem usadas.
 }

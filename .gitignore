@@ -1,0 +1,27 @@
+# Arquivos de estado local e locks (se não usar backend remoto)
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.tfstate.lock.info
+
+# Diretório .terraform que contém módulos e plugins baixados
+.terraform/
+
+# Arquivos .tfvars que contenham segredos (se houver)
+# É melhor usar variáveis de ambiente ou um cofre para segredos.
+# Se você tiver um terraform.tfvars com dados sensíveis, adicione-o.
+# *.tfvars (CUIDADO: isso ignoraria todos os .tfvars, geralmente você quer versionar o principal)
+# Exemplo: my-secrets.tfvars
+
+# Arquivos de log de crash
+crash.log
+crash.*.log
+
+# Arquivos de override
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Configurações de CLI
+.terraformrc
+terraform.rc
