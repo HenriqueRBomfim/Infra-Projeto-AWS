@@ -25,3 +25,9 @@ variable "ssh_access_cidr" {
                    # Se as regras SSH estiverem ativas e isso estiver vazio, ninguém acessa via SSH direto.
                    # O valor real virá do terraform.tfvars se as regras SSH forem usadas.
 }
+
+variable "my_home_ip_cidr" {
+  description = "Seu endereço IP público em formato CIDR para acesso restrito aos dashboards (ex: SEU_IP/32)"
+  type        = list(string)
+  # Não defina um default permissivo aqui; force a entrada no terraform.tfvars
+}

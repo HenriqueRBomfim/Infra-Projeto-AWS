@@ -130,3 +130,15 @@ variable "nextjs_port" {
   type        = number
   default     = 3000
 }
+
+variable "wazuh_server_instance_type" {
+  description = "O tipo de instância EC2 para o servidor Wazuh (ex: t3.medium)"
+  type        = string
+  default     = "t3.medium" # Verifique os requisitos do Wazuh, t2.micro/t3.micro podem ser insuficientes
+}
+
+variable "my_home_ip_cidr" {
+  description = "Seu endereço IP público em formato CIDR para acesso restrito aos dashboards (ex: SEU_IP/32)"
+  type        = list(string)
+  # Não defina um default permissivo aqui; force a entrada no terraform.tfvars
+}

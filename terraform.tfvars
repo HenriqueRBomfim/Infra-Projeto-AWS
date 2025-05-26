@@ -5,7 +5,7 @@ private_subnet_cidrs              = ["10.0.101.0/24", "10.0.102.0/24"]
 availability_zones                = ["us-east-2a", "us-east-2b"]
 environment                       = "dev"
 ami_id                            = "ami-0b05d988257befbbe"
-key_name                          = "infra-key" # Corrigido de infra-keys para infra-key, como você mencionou anteriormente.
+key_name                          = "infra-key"
 instance_type_frontend            = "t2.micro"
 instance_type_backend             = "t2.micro"
 
@@ -26,3 +26,9 @@ github_ssh_key_secret_name        = "dev/github/backend_deploy_key_private"
 # Adição sugerida para o frontend (se não estiver usando o default 3000 do variables.tf)
 nextjs_port                       = 3000 # Porta interna do Next.js que o Nginx fará proxy.
                                          # Se o default 3000 em variables.tf já é o desejado, esta linha é opcional.
+
+wazuh_server_instance_type = "t3.medium" # Ou "t3.large", dependendo da carga esperada.
+                                         # Verifique a documentação do Wazuh para recomendações.
+
+# Se adicionou my_home_ip_cidr em variables.tf:
+my_home_ip_cidr            = ["186.232.61.64/32"] # Substitua pelo seu IP real!                                         

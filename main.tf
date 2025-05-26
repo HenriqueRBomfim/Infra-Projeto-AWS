@@ -12,6 +12,7 @@ module "security" {
   vpc_id           = module.vpc.vpc_id
   environment      = var.environment
   backend_app_port = var.backend_app_port
+  my_home_ip_cidr  = var.my_home_ip_cidr 
 }
 
 # Data source para obter o ID da conta AWS atual (necessário para construir ARNs de segredos)
@@ -106,20 +107,23 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 data "template_file" "frontend_user_data" {
   template = file("${path.module}/user_data_frontend.sh")
   vars = {
-    frontend_repo_url = var.frontend_repo_url
-    NEXTJS_PORT       = var.nextjs_port # Passa a porta para o script do frontend
+    frontend_repo_url     = var.frontend_repo_url
+    NEXTJS_PORT           = var.nextjs_port
+    WAZUH_SERVER_IP       = module.ec2_wazuh_server.private_ip # <<< Adicionado
   }
 }
 
 data "template_file" "backend_user_data" {
   template = file("${path.module}/user_data_backend.sh")
   vars = {
-    backend_repo_url                  = var.backend_repo_url # Deve ser a URL SSH se usar Deploy Keys
-    APP_PORT                          = var.backend_app_port # Chave usada no script para a porta da API
+    backend_repo_url                  = var.backend_repo_url
+    # APP_PORT foi o nome da chave que definimos antes para o script backend
+    APP_PORT                          = var.backend_app_port
     aws_region                        = var.region
     backend_repo_branch               = var.backend_repo_branch
     db_credentials_secret_name_postgres = var.db_credentials_secret_name_postgres
-    github_ssh_key_secret_name        = var.github_ssh_key_secret_name # Para Deploy Keys SSH
+    github_ssh_key_secret_name        = var.github_ssh_key_secret_name
+    WAZUH_SERVER_IP                   = module.ec2_wazuh_server.private_ip # <<< Adicionado
   }
 }
 
@@ -166,5 +170,37 @@ module "ec2_backend" {
     Tier        = "Backend"
     Project     = "MeuProjetoWebApp" # Exemplo de tag
     Environment = var.environment
+  }
+}
+
+data "template_file" "user_data_wazuh_server" {
+  template = file("${path.module}/user_data_wazuh_server.sh")
+  vars = {
+    # Adicione quaisquer variáveis que o script user_data_wazuh_server.sh precise
+    # Ex: WA_Admin_Password = var.wazuh_admin_password # Se você for gerar/passar uma senha
+  }
+}
+
+module "ec2_wazuh_server" {
+  source = "./modules/ec2" # Seu módulo EC2 existente
+
+  instance_name               = "${var.environment}-wazuh-server"
+  ami                         = var.ami_id # Pode usar o mesmo Ubuntu AMI
+  instance_type               = var.wazuh_server_instance_type
+  key_name                    = var.key_name # Mesmo par de chaves (para acesso via Session Manager, a chave não é usada ativamente)
+  # Colocar em subnet pública para acesso ao dashboard (restringido pelo SG ao seu IP)
+  subnet_id                   = module.vpc.public_subnet_ids[0]
+  security_group_ids          = [module.security.wazuh_server_sg_id] # Novo SG
+  user_data                   = data.template_file.user_data_wazuh_server.rendered
+  iam_instance_profile_name   = aws_iam_instance_profile.ec2_profile.name # Reutiliza o perfil existente
+                                                                         # A role 'ec2_role' já tem permissão para SSM.
+                                                                         # Se o Wazuh Server precisar de outras permissões AWS, considere uma role dedicada.
+  associate_public_ip_address = true # Para ter um IP público para acessar o dashboard
+
+  tags = {
+    Tier        = "Security"
+    Application = "Wazuh-Server"
+    Environment = var.environment
+    Project     = "MeuProjetoWebApp"
   }
 }
