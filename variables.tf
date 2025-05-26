@@ -117,3 +117,16 @@ variable "db_credentials_secret_name_postgres" {
   type        = string
   default     = "app/rds/postgres/credentials"
 }
+
+variable "github_ssh_key_secret_name" {
+  description = "O nome do segredo no AWS Secrets Manager que armazena a chave privada SSH para o deploy do backend GitHub"
+  type        = string
+  # Nenhum default, pois deve ser específico do seu setup do Secrets Manager
+}
+
+# E garanta que var.nextjs_port também está declarada (para o frontend_user_data)
+variable "nextjs_port" {
+  description = "A porta interna em que a aplicação Next.js vai rodar"
+  type        = number
+  default     = 3000
+}
