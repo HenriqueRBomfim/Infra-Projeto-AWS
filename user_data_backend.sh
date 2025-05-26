@@ -4,9 +4,7 @@ exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo ">>> Iniciando user_data_backend.sh para API FastAPI com PostgreSQL RDS e Deploy Key SSH"
 
-# Variáveis injetadas pelo Terraform (usar ${...} aqui)
-REPO_URL_SSH="${backend_repo_url}" # Deve ser a URL SSH do repositório
-APP_PORT_FROM_TF="${backend_app_port}" # Renomeado para clareza, valor vindo do Terraform
+REPO_URL_SSH="${backend_repo_url}"
 AWS_REGION_FOR_CLI="${aws_region}"
 DB_CREDENTIALS_SECRET_NAME="${db_credentials_secret_name_postgres}"
 BACKEND_REPO_BRANCH="${backend_repo_branch}"
@@ -93,7 +91,7 @@ if [ -n "$DB_CREDENTIALS_SECRET_NAME" ]; then
     DB_USER=$(echo "$SECRET_JSON_STRING" | jq -r .username)
     DB_PASSWORD=$(echo "$SECRET_JSON_STRING" | jq -r .password)
     DB_HOST=$(echo "$SECRET_JSON_STRING" | jq -r .host)
-    DB_PORT_FROM_SECRET=$(echo "$SECRET_JSON_STRING" | jq -r .port) # Renomeado para evitar conflito com APP_PORT_FROM_TF se usasse o mesmo nome
+    DB_PORT_FROM_SECRET=$(echo "$SECRET_JSON_STRING" | jq -r .port)
     DB_NAME=$(echo "$SECRET_JSON_STRING" | jq -r .dbname)
 
     DB_CONN_STRING_PREFIX="postgresql+psycopg2://"
@@ -104,7 +102,7 @@ if [ -n "$DB_CREDENTIALS_SECRET_NAME" ]; then
 
     echo "DATABASE_URL configurada para PostgreSQL via Secrets Manager."
     echo "DATABASE_URL='$${DATABASE_URL}'" | sudo tee "$DB_ENV_FILE" > /dev/null # Escapado com $$
-    echo "PORT='${APP_PORT_FROM_TF}'" | sudo tee -a "$DB_ENV_FILE" > /dev/null # APP_PORT_FROM_TF é do Terraform, NÃO escapar
+    echo "PORT='${APP_PORT}'" | sudo tee -a "$DB_ENV_FILE" > /dev/null
     echo "Variáveis de ambiente salvas em $DB_ENV_FILE"
   else
     echo "ERRO CRÍTICO: Falha ao buscar credenciais do BD PostgreSQL do Secrets Manager. Verifique permissões IAM e nome do segredo."
@@ -122,7 +120,7 @@ fi
 sudo "$VENV_DIR/bin/alembic" -c "$APP_DIR/alembic.ini" upgrade head
 
 
-echo ">>> Iniciando aplicação FastAPI com Gunicorn/Uvicorn na porta ${APP_PORT_FROM_TF}" # Usando a variável injetada pelo TF
+echo ">>> Iniciando aplicação FastAPI com Gunicorn/Uvicorn na porta ${APP_PORT}" # Usando a variável injetada pelo TF
 cd "$APP_DIR"
 
 sudo tee /etc/systemd/system/backend-api.service > /dev/null <<EOL
