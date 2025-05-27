@@ -121,10 +121,8 @@ variable "db_credentials_secret_name_postgres" {
 variable "github_ssh_key_secret_name" {
   description = "O nome do segredo no AWS Secrets Manager que armazena a chave privada SSH para o deploy do backend GitHub"
   type        = string
-  # Nenhum default, pois deve ser específico do seu setup do Secrets Manager
 }
 
-# E garanta que var.nextjs_port também está declarada (para o frontend_user_data)
 variable "nextjs_port" {
   description = "A porta interna em que a aplicação Next.js vai rodar"
   type        = number
@@ -134,11 +132,10 @@ variable "nextjs_port" {
 variable "wazuh_server_instance_type" {
   description = "O tipo de instância EC2 para o servidor Wazuh (ex: t3.medium)"
   type        = string
-  default     = "t3.medium" # Verifique os requisitos do Wazuh, t2.micro/t3.micro podem ser insuficientes
+  default     = "t3.medium"
 }
 
 variable "my_home_ip_cidr" {
   description = "Seu endereço IP público em formato CIDR para acesso restrito aos dashboards (ex: SEU_IP/32)"
   type        = list(string)
-  # Não defina um default permissivo aqui; force a entrada no terraform.tfvars
 }

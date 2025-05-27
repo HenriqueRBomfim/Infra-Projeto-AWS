@@ -31,4 +31,4 @@ wazuh_server_instance_type = "t3.medium" # Ou "t3.large", dependendo da carga es
                                          # Verifique a documentação do Wazuh para recomendações.
 
 # Se adicionou my_home_ip_cidr em variables.tf:
-my_home_ip_cidr            = ["186.232.61.64/32"] # Substitua pelo seu IP real!                                         
+my_home_ip_cidr            = ["186.232.61.64/32"]                                      

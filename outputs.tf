@@ -50,3 +50,8 @@ output "db_credentials_postgres_secret_arn" {
   description = "The ARN of the Secrets Manager secret for PostgreSQL DB credentials"
   value       = aws_secretsmanager_secret.db_credentials_postgres.arn
 }
+
+output "frontend_alb_dns_name" {
+  description = "O nome DNS do Application Load Balancer para o frontend"
+  value       = aws_lb.frontend_alb.dns_name
+}

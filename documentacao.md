@@ -1,148 +1,179 @@
-# Documentação do Projeto: Infraestrutura AWS com Terraform
+# Documentação Completa do Projeto: Infraestrutura AWS com Terraform
 
 ## 1. Introdução e Objetivo do Projeto
 
-Este documento descreve o processo de criação e configuração de uma infraestrutura na Amazon Web Services (AWS) utilizando Terraform. O objetivo é hospedar uma aplicação web composta por um frontend (Next.js) e um backend (API FastAPI com PostgreSQL), seguindo as melhores práticas de segurança, modularização e infraestrutura como código. Esta documentação serve como um registro do desenvolvimento até o ponto de implantação via `terraform apply`.
+Este documento detalha a concepção, implementação e configuração de uma infraestrutura robusta e segura na Amazon Web Services (AWS) utilizando Terraform. O objetivo principal é hospedar uma aplicação web moderna, composta por um frontend (Next.js) e um backend (API FastAPI com PostgreSQL). A infraestrutura foi projetada com foco em segurança, alta disponibilidade, monitoramento e automação, incorporando ferramentas como Wazuh para detecção de intrusão (IDS/HIDS), Zabbix para monitoramento de performance e disponibilidade, um Application Load Balancer (ALB) para distribuição de tráfego e acesso via DNS, e um pipeline de CI/CD utilizando GitHub Actions para automação de deploy. Esta documentação serve como um registro completo do desenvolvimento e da arquitetura final implantada.
 
-## 2. Configuração Inicial do Ambiente AWS
+## 2. Configuração Inicial do Ambiente AWS e Desenvolvimento
 
-### 2.1. Criação de Usuário IAM Admin
-O primeiro passo foi a criação de um usuário IAM (Identity and Access Management) na conta AWS com permissões administrativas. Esta abordagem evita o uso da conta root para operações do dia a dia, seguindo as melhores práticas de segurança da AWS.
+### 2.1. Criação de Usuário IAM Admin e Configuração de Credenciais
+Conforme as melhores práticas da AWS, um usuário IAM com permissões administrativas foi criado para gerenciar os recursos, evitando o uso da conta root. As credenciais de acesso programático (Access Key ID e Secret Access Key) deste usuário foram configuradas localmente utilizando o AWS Command Line Interface (AWS CLI) com `aws configure`, estabelecendo o perfil `default` que o Terraform utiliza para autenticação.
 
-**Ações Realizadas:**
-* Criação de um novo usuário IAM.
-* Atribuição da política `AdministratorAccess` a este usuário.
-* Geração de chaves de acesso (Access Key ID e Secret Access Key) para este usuário, para permitir o acesso programático.
+### 2.2. Instalação do Terraform
+O Terraform foi instalado no ambiente de desenvolvimento local para permitir a definição e o provisionamento da infraestrutura como código. O PATH do sistema foi configurado para incluir o executável do Terraform.
 
-### 2.2. Configuração de Credenciais AWS (AWS CLI)
-As chaves de acesso geradas para o usuário IAM Admin foram configuradas localmente no ambiente de desenvolvimento utilizando o AWS Command Line Interface (AWS CLI).
+## 3. Estrutura do Projeto Terraform (`INFRA-PROJETO-AWS`)
 
-**Ações Realizadas:**
-* Instalação do AWS CLI.
-* Execução do comando `aws configure`.
-* Inserção do Access Key ID, Secret Access Key, região padrão (ex: `us-east-2`) e formato de saída padrão (ex: `json`). Isso criou um perfil de credenciais (geralmente o perfil `default`) que o Terraform utilizará para autenticar com a AWS.
+O projeto foi estruturado de forma modular para promover a clareza, reutilização e manutenibilidade.
 
-## 3. Configuração do Ambiente de Desenvolvimento Local
-
-### 3.1. Instalação do Terraform
-O Terraform foi instalado no ambiente de desenvolvimento local para permitir a criação e gerenciamento da infraestrutura como código.
-
-**Ações Realizadas:**
-* Download do binário do Terraform do site oficial.
-* Configuração do PATH do sistema para incluir o executável do Terraform, permitindo que ele seja chamado de qualquer diretório no terminal.
-
-## 4. Estrutura do Projeto Terraform (`INFRA-PROJETO-AWS`)
-
-O projeto Terraform foi organizado de forma modular para promover a reutilização e a clareza.
-
-### 4.1. Visão Geral
-A estrutura do projeto consiste em um módulo raiz que orquestra módulos locais para diferentes componentes da infraestrutura.
-
+### 3.1. Visão Geral da Estrutura de Arquivos
 
 INFRA-PROJETO-AWS/
 ├── modules/
-│   ├── ec2/       # Módulo para instâncias EC2
-│   ├── security/  # Módulo para Security Groups
-│   └── vpc/       # Módulo para VPC e rede
-├── main.tf        # Configuração principal do módulo raiz
-├── variables.tf   # Declaração de variáveis de entrada do projeto
-├── terraform.tfvars # Valores para as variáveis de entrada
-├── outputs.tf     # Saídas do projeto
-├── provider.tf    # Configuração do provedor AWS
-├── database_postgres.tf # Configuração do RDS e Secrets Manager
-├── user_data_frontend.sh # Script de inicialização do frontend
-└── user_data_backend.sh  # Script de inicialização do backend
+│   ├── ec2/                   # Módulo para instâncias EC2
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   └── variables.tf
+│   ├── security/              # Módulo para Security Groups
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   └── variables.tf
+│   └── vpc/                   # Módulo para VPC e componentes de rede
+│       ├── main.tf
+│       ├── outputs.tf
+│       └── variables.tf
+├── main.tf                    # Configuração principal do módulo raiz (orquestração)
+├── variables.tf               # Declaração de variáveis de entrada globais do projeto
+├── terraform.tfvars           # Valores específicos para as variáveis de entrada
+├── outputs.tf                 # Saídas globais do projeto (ex: DNS do ALB, IPs)
+├── provider.tf                # Configuração do provedor AWS
+├── database_app.tf            # Configuração do RDS para a aplicação e Secrets Manager
+├── database_zabbix.tf         # Configuração do RDS para o Zabbix e Secrets Manager (se Zabbix usar RDS)
+├── load_balancer.tf           # Configuração do Application Load Balancer
+├── user_data_frontend.sh      # Script de inicialização para instâncias frontend
+├── user_data_backend.sh       # Script de inicialização para instâncias backend
+├── user_data_wazuh_server.sh  # Script de inicialização para o servidor Wazuh
+└── user_data_zabbix_server.sh # Script de inicialização para o servidor Zabbix
 
 
-### 4.2. Módulo Raiz
-Localizado na pasta `INFRA-PROJETO-AWS/`, o módulo raiz contém:
-* **`main.tf`**: Define os recursos globais (como a configuração IAM para EC2, o perfil da instância, e os data sources para os scripts de user data) e chama os módulos locais (VPC, Security, EC2).
-* **`variables.tf`**: Declara todas as variáveis de entrada do projeto (ex: região, CIDRs, URLs de repositórios, configurações de banco de dados).
-* **`terraform.tfvars`**: Fornece os valores específicos para as variáveis de entrada para este ambiente de implantação.
-* **`outputs.tf`**: Define quais informações serão exibidas após a aplicação do Terraform (ex: IP público do frontend, endpoint do RDS).
-* **`provider.tf`**: Configura o provedor AWS, especificando a região e o perfil de credenciais.
-* **`database_postgres.tf`**: Define os recursos para o banco de dados RDS PostgreSQL e o armazenamento seguro de suas credenciais no AWS Secrets Manager.
+### 4. Componentes da Infraestrutura e Decisões de Design
 
-### 4.3. Módulos Locais
-* **Módulo VPC (`modules/vpc/`)**: Responsável pela criação da Virtual Private Cloud (VPC), subnets públicas e privadas em múltiplas Zonas de Disponibilidade, Internet Gateway (IGW), NAT Gateway (com Elastic IP) e as tabelas de rotas associadas para garantir a conectividade correta.
-* **Módulo Security (`modules/security/`)**: Gerencia os Security Groups. Cria um grupo para o frontend (permitindo tráfego HTTP/S público) e um para o backend (permitindo tráfego na porta da API apenas a partir do security group do frontend). O acesso SSH foi planejado para ser via AWS Systems Manager Session Manager, removendo a necessidade de expor a porta 22.
-* **Módulo EC2 (`modules/ec2/`)**: Define um módulo genérico para criar instâncias EC2. É chamado duas vezes pelo módulo raiz: uma para a instância do frontend e outra para a instância do backend, cada uma com suas configurações específicas (AMI, tipo de instância, subnet, security groups, user data, IAM profile).
+#### 4.1. Rede (VPC - Virtual Private Cloud)
+* **Definição:** Uma VPC customizada (`10.0.0.0/16`) foi criada para isolar os recursos da aplicação.
+* **Subnets:**
+    * **Públicas:** Duas subnets públicas distribuídas em diferentes Zonas de Disponibilidade (AZs, ex: `us-east-2a`, `us-east-2b`) para alta disponibilidade. Hospedam recursos que precisam de acesso direto à internet, como o Application Load Balancer, e opcionalmente os servidores Wazuh e Zabbix (para acesso aos dashboards, com Security Groups restritos).
+    * **Privadas:** Duas subnets privadas, também em AZs distintas, para recursos que não devem ser diretamente acessíveis pela internet, como as instâncias EC2 do backend e os bancos de dados RDS.
+* **Conectividade:**
+    * **Internet Gateway (IGW):** Anexado à VPC para permitir comunicação entre recursos nas subnets públicas e a internet.
+    * **NAT Gateway:** Um NAT Gateway (com um Elastic IP associado) foi provisionado em uma das subnets públicas para permitir que instâncias nas subnets privadas iniciem conexões de saída para a internet (ex: para atualizações de pacotes, download de dependências, ou acesso a APIs externas), sem permitir conexões de entrada da internet.
+    * **Tabelas de Rotas:** Configurações específicas para subnets públicas (rota padrão para o IGW) e privadas (rota padrão para o NAT Gateway).
 
-## 5. Componentes da Infraestrutura e Decisões de Design
+#### 4.2. Segurança
+* **Security Groups (SGs):**
+    * **ALB SG:** Permite tráfego de entrada da internet nas portas 80 (HTTP) e 443 (HTTPS). Permite tráfego de saída para o `Frontend SG` na porta da aplicação (ex: 80).
+    * **Frontend SG:** Permite tráfego de entrada na porta da aplicação (ex: 80, onde o Nginx escuta) **somente** a partir do `ALB SG`.
+    * **Backend SG:** Permite tráfego de entrada na porta da API backend (ex: 8000) **somente** a partir do `Frontend SG`.
+    * **RDS App SG:** Permite tráfego de entrada na porta do PostgreSQL (5432) **somente** a partir do `Backend SG`.
+    * **Wazuh Server SG:** Permite tráfego de entrada na porta 443 (HTTPS para o dashboard) de um IP específico (`my_home_ip_cidr`), e nas portas 1514/TCP (registro) e 1515/TCP (eventos) a partir dos SGs do frontend e backend.
+    * **Zabbix Server SG:** Permite tráfego de entrada na porta 80/443 (Web UI) de `my_home_ip_cidr`, e na porta 10051/TCP (agentes passivos) a partir dos SGs das instâncias monitoradas.
+    * **RDS Zabbix SG:** Permite tráfego de entrada na porta do banco de dados (ex: 5432 para PostgreSQL) **somente** a partir do `Zabbix Server SG`.
+    * **Acesso SSH:** As regras de SSH (porta 22) foram removidas de todos os SGs das instâncias EC2 em favor do uso exclusivo do **AWS Systems Manager Session Manager** para acesso seguro.
+* **IAM (Identity and Access Management):**
+    * Uma IAM Role (`ec2_role`) foi criada para todas as instâncias EC2.
+    * Políticas anexadas: `AmazonSSMManagedInstanceCore` (para Session Manager), permissões para ler segredos específicos do AWS Secrets Manager (credenciais dos bancos de dados da aplicação e Zabbix, chave SSH do GitHub para deploy do backend).
+    * Um IAM Instance Profile (`ec2_profile`) associa a role às instâncias.
+* **AWS Secrets Manager:**
+    * Credenciais dos bancos de dados RDS (aplicação e Zabbix) são geradas aleatoriamente (senha) e armazenadas de forma segura.
+    * A chave SSH privada (Deploy Key) para clonar o repositório backend privado também é armazenada aqui.
+    * As instâncias EC2 (backend, Zabbix server) usam sua IAM Role para buscar essas credenciais em tempo de execução.
 
-### 5.1. Rede (VPC)
-Uma VPC customizada (`10.0.0.0/16`) foi projetada com:
-* **Subnets Públicas**: Para recursos que precisam de acesso direto à internet, como a instância EC2 do frontend. Estas subnets têm rotas para o Internet Gateway.
-* **Subnets Privadas**: Para recursos que não devem ser diretamente acessíveis pela internet, como a instância EC2 do backend e o banco de dados RDS. Estas subnets têm rotas para um NAT Gateway (localizado em uma subnet pública) para permitir acesso de saída à internet (ex: para baixar pacotes ou conectar-se a serviços externos, se necessário).
-* **Zonas de Disponibilidade (AZs)**: As subnets foram distribuídas em múltiplas AZs (`us-east-2a`, `us-east-2b`) para aumentar a resiliência.
+#### 4.3. Cômputo (EC2 - Elastic Compute Cloud)
+* **Instância Frontend:**
+    * Tipo: `t2.micro` (ou `t3.micro`), AMI Ubuntu.
+    * Localização: Subnet pública.
+    * Configuração: Via `user_data_frontend.sh` (Node.js, Next.js, PM2, Nginx, agente Wazuh, agente Zabbix).
+    * Acessada via Application Load Balancer.
+* **Instância Backend:**
+    * Tipo: `t2.micro` (ou `t3.micro`), AMI Ubuntu.
+    * Localização: Subnet privada.
+    * Configuração: Via `user_data_backend.sh` (Python, FastAPI, Gunicorn, Alembic, agente Wazuh, agente Zabbix), com acesso seguro ao repositório GitHub via Deploy Key SSH.
+* **Instância Wazuh Server:**
+    * Tipo: `t3.medium` (ou superior), AMI Ubuntu.
+    * Localização: Subnet pública (para acesso ao dashboard, com SG restrito).
+    * Configuração: Via `user_data_wazuh_server.sh` (instalação "all-in-one" do Wazuh, agente Zabbix).
+* **Instância Zabbix Server:**
+    * Tipo: `t3.medium` (ou superior), AMI Ubuntu.
+    * Localização: Subnet pública (para acesso ao UI, com SG restrito).
+    * Configuração: Via `user_data_zabbix_server.sh` (instalação do Zabbix server, frontend, agente Zabbix local, configuração para usar o RDS Zabbix).
 
-### 5.2. Segurança
-* **Security Groups**:
-    * **Frontend SG**: Permite tráfego de entrada nas portas 80 (HTTP) e 443 (HTTPS) de qualquer origem (`0.0.0.0/0`).
-    * **Backend SG**: Permite tráfego de entrada na porta da aplicação backend (ex: `8000`) somente a partir do Security Group do frontend. Isso isola o backend da internet direta.
-    * **RDS SG**: Permite tráfego de entrada na porta do PostgreSQL (5432) somente a partir do Security Group do backend.
-    * **Acesso SSH**: As regras de SSH (porta 22) foram removidas dos Security Groups das instâncias EC2 em favor do uso do AWS Systems Manager Session Manager para acesso seguro.
-* **IAM (Identity and Access Management)**:
-    * Uma IAM Role (`ec2_role`) foi criada para as instâncias EC2.
-    * Políticas anexadas a esta role incluem:
-        * `AmazonSSMManagedInstanceCore`: Para permitir o uso do Session Manager.
-        * Permissão para ler o segredo das credenciais do banco de dados do AWS Secrets Manager.
-        * (Opcional) `AmazonS3ReadOnlyAccess`.
-    * Um IAM Instance Profile (`ec2_profile`) foi criado para associar a role às instâncias.
+#### 4.4. Bancos de Dados (RDS - Relational Database Service)
+* **RDS para Aplicação:**
+    * Motor: PostgreSQL (ex: versão `16.x`).
+    * Classe: `db.t3.micro`.
+    * Localização: Subnets privadas, usando um `aws_db_subnet_group`.
+    * Segurança: Protegido pelo `RDS App SG`, não publicamente acessível, armazenamento criptografado.
+* **RDS para Zabbix:**
+    * Motor: PostgreSQL (ou MySQL, ex: versão `16.x` para PostgreSQL).
+    * Classe: `db.t3.micro` (ou superior).
+    * Localização: Subnets privadas, usando um `aws_db_subnet_group`.
+    * Segurança: Protegido pelo `RDS Zabbix SG`, não publicamente acessível, armazenamento criptografado.
 
-### 5.3. Instâncias de Cômputo (EC2)
-Duas instâncias EC2 (`t2.micro` ou `t3.micro`, usando AMI Ubuntu) são provisionadas:
-* **Instância Frontend**:
-    * Localizada em uma subnet pública.
-    * Associada ao `frontend_sg`.
-    * Executa a aplicação Next.js (com React e Tailwind CSS) utilizando um script `user_data`.
-* **Instância Backend**:
-    * Localizada em uma subnet privada.
-    * Associada ao `backend_sg`.
-    * Executa a API FastAPI (Python) com PostgreSQL utilizando um script `user_data`.
+#### 4.5. Balanceamento de Carga (Application Load Balancer - ALB)
+* Um ALB público foi configurado para o frontend.
+* **Listeners:** HTTP na porta 80 (com potencial redirecionamento para HTTPS se configurado). HTTPS na porta 443 (se um certificado ACM for provisionado).
+* **Target Group:** Aponta para as instâncias do frontend (Nginx na porta 80 ou diretamente para a aplicação Next.js).
+* **Health Checks:** Configurados para monitorar a saúde das instâncias frontend.
+* **DNS:** O acesso ao frontend é feito através do nome DNS estável fornecido pelo ALB.
 
-### 5.4. Banco de Dados (RDS PostgreSQL)
-* Uma instância RDS PostgreSQL (`db.t3.micro`, versão `16.2`) é provisionada.
-* Localizada nas subnets privadas utilizando um `aws_db_subnet_group`.
-* Protegida por um Security Group (`rds_postgres_sg`) que permite acesso apenas da instância backend.
-* Configurada para não ser publicamente acessível e com armazenamento criptografado.
+#### 4.6. Monitoramento de Segurança e Detecção de Intrusão (Wazuh - IDS/HIDS)
+* **Wazuh Server:** Uma instância EC2 dedicada (`dev-wazuh-server`) hospeda a instalação "all-in-one" do Wazuh (Manager, Indexer, Dashboard).
+* **Agentes Wazuh:** Instalados e configurados em todas as instâncias EC2 (frontend, backend, Zabbix server e no próprio Wazuh server) através de seus scripts `user_data`. Os agentes reportam ao IP privado do servidor Wazuh.
+* **Funcionalidade:** Coleta de logs, detecção de anomalias, verificação de integridade de arquivos, avaliação de vulnerabilidades e resposta a incidentes.
 
-### 5.5. Gerenciamento de Segredos (AWS Secrets Manager)
-* As credenciais (usuário master e senha gerada aleatoriamente) para o banco de dados RDS PostgreSQL são armazenadas de forma segura no AWS Secrets Manager.
-* A instância EC2 do backend utiliza sua IAM Role para buscar essas credenciais em tempo de execução.
+#### 4.7. Monitoramento de Performance e Disponibilidade (Zabbix)
+* **Zabbix Server:** Uma instância EC2 dedicada (`dev-zabbix-server`) hospeda o Zabbix server e o frontend web.
+* **Banco de Dados Zabbix:** Utiliza uma instância RDS PostgreSQL dedicada.
+* **Agentes Zabbix:** Instalados e configurados em todas as instâncias EC2 (frontend, backend, Wazuh server e no próprio Zabbix server) através de seus scripts `user_data`. Os agentes reportam ao IP privado do servidor Zabbix.
+* **Funcionalidade:** Coleta de métricas de sistema (CPU, memória, disco, rede), monitoramento de serviços, disponibilidade de aplicações, e alertas.
 
-### 5.6. Acesso às Instâncias (AWS Systems Manager Session Manager)
-Para acesso seguro às instâncias EC2 (tanto frontend quanto backend) sem expor a porta SSH (22), o AWS Systems Manager Session Manager foi configurado. Isso é habilitado pela IAM Role com a política `AmazonSSMManagedInstanceCore` e pelo SSM Agent pré-instalado na AMI Ubuntu.
+## 7. Scripts de User Data
 
-## 6. Scripts de User Data
+Scripts de inicialização (`user_data`) automatizam a configuração das instâncias EC2:
+* **`user_data_frontend.sh`**: Instala Node.js, Git, Nginx. Clona o repositório frontend, instala dependências, builda o Next.js, configura Nginx como proxy reverso, inicia a aplicação com `pm2`. Instala e configura os agentes Wazuh e Zabbix.
+* **`user_data_backend.sh`**: Instala Python, Git, jq, openssh-client. Configura chave SSH para clonar o repositório backend privado. Cria ambiente virtual, instala dependências (FastAPI, Gunicorn, etc.). Busca credenciais do BD da aplicação do Secrets Manager. Executa migrações Alembic. Inicia a API com `systemd` e Gunicorn. Instala e configura os agentes Wazuh e Zabbix.
+* **`user_data_wazuh_server.sh`**: Baixa e executa o script de instalação "all-in-one" do Wazuh. Instala e configura o agente Zabbix.
+* **`user_data_zabbix_server.sh`**: Instala o Zabbix server, frontend e agente. Configura a conexão com o banco de dados RDS Zabbix (buscando credenciais do Secrets Manager) e importa o schema inicial. Configura o servidor web para o frontend Zabbix. Instala e configura o agente Wazuh.
 
-Scripts de inicialização (`user_data`) são usados para configurar as instâncias EC2 no primeiro boot:
-* **`user_data_frontend.sh`**:
-    * Instala Node.js, Git, Nginx.
-    * Clona o repositório frontend do GitHub.
-    * Instala dependências (`npm install`).
-    * Realiza o build da aplicação Next.js (`npm run build`).
-    * Configura o Nginx como um proxy reverso para a aplicação Next.js.
-    * Inicia a aplicação Next.js usando `pm2` para gerenciamento de processos.
-* **`user_data_backend.sh`**:
-    * Instala Python, pip, venv, Git, `jq`.
-    * Clona o repositório backend da API (branch `aws-deploy`) do GitHub.
-    * Cria um ambiente virtual Python e instala as dependências do `requirements.txt` (incluindo FastAPI, Uvicorn, Gunicorn, psycopg2-binary, Alembic).
-    * Busca as credenciais do banco de dados do AWS Secrets Manager e as configura como variáveis de ambiente (ou em um arquivo `.env`).
-    * Executa as migrações do Alembic (`alembic upgrade head`).
-    * Cria e inicia um serviço `systemd` para rodar a aplicação FastAPI com Gunicorn e Uvicorn workers.
+## 8. Versionamento e Modularização
 
-## 7. Versionamento e Modularização
+* **Modularização**: O código Terraform foi dividido em módulos locais (VPC, Security, EC2) para organização e reutilização.
+* **Versionamento**: O projeto de infraestrutura é gerenciado usando Git, com branches para desenvolvimento de features. O Terraform especifica as versões requeridas dos provedores. A branch `aws-deploy` no repositório da API backend contém configurações específicas para a AWS.
 
-* **Modularização**: O código Terraform foi dividido em módulos locais (VPC, Security, EC2) para melhor organização, reutilização e manutenibilidade.
-* **Versionamento**: O projeto de infraestrutura é gerenciado usando Git. Foi criada uma branch `aws-deploy` no repositório da API para conter as configurações específicas da AWS (como o `env.py` e `alembic.ini` modificados para ler a `DATABASE_URL` do ambiente). O Terraform também especifica as versões requeridas do provedor AWS.
+## 9. CI/CD (Integração e Entrega/Deploy Contínuos)
 
-## 8. Próximos Passos: Deploy com Terraform
+Para automatizar o processo de build, testes e deploy da infraestrutura, um pipeline de CI/CD será implementado utilizando **GitHub Actions**.
 
-Com toda a configuração revisada e considerada correta, os próximos passos são executar os comandos Terraform para provisionar a infraestrutura na AWS:
-1.  **`terraform init -upgrade`**: Para inicializar o diretório de trabalho, baixar os provedores e módulos.
-2.  **`terraform validate`**: Para verificar a sintaxe e consistência da configuração.
-3.  **`terraform plan`**: Para revisar as ações que o Terraform executará.
-4.  **`terraform apply`**: Para aplicar as configurações e criar os recursos na AWS.
+### 9.1. Fluxo do Pipeline Proposto
+1.  **Trigger:** O pipeline é acionado por um push para a branch `main` (para deploy em dev/staging) ou por um merge para uma branch de produção (ex: `release`), ou na criação/atualização de Pull Requests para a branch `main`.
+2.  **Fase de Integração Contínua (CI) - Em Pull Requests e Pushes para `main`:**
+    * **Checkout do Código:** Obtém a última versão do código do repositório.
+    * **Setup do Terraform:** Instala a versão especificada do Terraform.
+    * **Formatação (`terraform fmt -check`):** Verifica se o código está formatado corretamente.
+    * **Linting (`tflint`):** Analisa o código em busca de erros, melhores práticas e possíveis problemas.
+    * **Validação (`terraform validate`):** Garante que a sintaxe da configuração é válida.
+    * **Análise Estática de Segurança (`tfsec` ou `Checkov`):** Escaneia o código em busca de más configurações de segurança.
+    * **Geração do Plano (`terraform plan`):**
+        * Para Pull Requests: Gera um plano e posta um resumo como comentário no PR para revisão.
+        * Para pushes para `main`: Gera um plano e o armazena como um artefato.
+    * **(Opcional) Estimativa de Custo (`Infracost`):** Mostra o impacto financeiro das mudanças.
+3.  **Fase de Deploy Contínuo (CD) - Somente para a branch `main` (ou `release`):**
+    * **Aprovação Manual (para Produção):** Para deploys em ambientes de produção, uma etapa de aprovação manual é crucial após a revisão do plano. Para ambientes de desenvolvimento/staging, o apply pode ser automático se o plano for bem-sucedido.
+    * **Download do Plano (se armazenado):** Obtém o arquivo de plano gerado na fase de CI.
+    * **Aplicação (`terraform apply "plan.tfplan"`):** Aplica as mudanças de infraestrutura na AWS.
+    * **(Opcional) Testes de Integração/Smoke Tests:** Após o `apply`, executa testes básicos para verificar se os principais componentes da infraestrutura e da aplicação estão funcionando.
 
-Após o `apply`, serão realizados testes para verificar a funcionalidade do frontend, do backend e a comunicação entre eles, bem como o acesso ao banco de dados e o acesso às instâncias via Session Manager.
+### 9.2. Configuração do GitHub Actions
+* Um arquivo de workflow YAML (ex: `.github/workflows/terraform.yml`) será criado no repositório de infraestrutura.
+* Este workflow definirá os jobs e steps para cada fase (CI e CD).
+* Credenciais da AWS serão armazenadas de forma segura como "Secrets" no GitHub e usadas pelo workflow para autenticar com a AWS.
+
+## 10. Conclusão e Próximos Passos Pós-Deploy
+
+Após a execução bem-sucedida do `terraform apply` para toda a infraestrutura descrita:
+* Verificar a funcionalidade completa do frontend (acessado via DNS do ALB) e do backend.
+* Confirmar a conectividade com os bancos de dados RDS.
+* Acessar os dashboards do Wazuh e Zabbix, verificar se os servidores estão operacionais e se todos os agentes (frontend, backend, Wazuh server, Zabbix server) estão reportando corretamente.
+* Realizar testes de segurança e monitoramento para validar a eficácia das ferramentas implementadas.
+* Continuar o desenvolvimento do pipeline de CI/CD.
+
+Esta infraestrutura estabelece uma base sólida, segura e monitorada para a aplicação web, utilizando práticas modernas de IaC e DevOps.

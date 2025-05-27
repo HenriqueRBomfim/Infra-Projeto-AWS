@@ -109,7 +109,8 @@ data "template_file" "frontend_user_data" {
   vars = {
     frontend_repo_url     = var.frontend_repo_url
     NEXTJS_PORT           = var.nextjs_port
-    WAZUH_SERVER_IP       = module.ec2_wazuh_server.private_ip # <<< Adicionado
+    WAZUH_SERVER_IP       = module.ec2_wazuh_server.private_ip 
+    aws_region        = var.region
   }
 }
 
@@ -123,7 +124,7 @@ data "template_file" "backend_user_data" {
     backend_repo_branch               = var.backend_repo_branch
     db_credentials_secret_name_postgres = var.db_credentials_secret_name_postgres
     github_ssh_key_secret_name        = var.github_ssh_key_secret_name
-    WAZUH_SERVER_IP                   = module.ec2_wazuh_server.private_ip # <<< Adicionado
+    WAZUH_SERVER_IP                   = module.ec2_wazuh_server.private_ip
   }
 }
 
