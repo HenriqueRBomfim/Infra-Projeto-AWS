@@ -2,7 +2,7 @@
 
 ## 1. Introdução e Objetivo do Projeto
 
-Este documento detalha a concepção, implementação e configuração de uma infraestrutura robusta e segura na Amazon Web Services (AWS) utilizando Terraform. O objetivo principal é hospedar uma aplicação web moderna, composta por um frontend (Next.js) e um backend (API FastAPI com PostgreSQL). A infraestrutura foi projetada com foco em segurança, alta disponibilidade, monitoramento e automação, incorporando ferramentas como Wazuh para detecção de intrusão (IDS/HIDS), Zabbix para monitoramento de performance e disponibilidade, um Application Load Balancer (ALB) para distribuição de tráfego e acesso via DNS, e um pipeline de CI/CD utilizando GitHub Actions para automação de deploy. Esta documentação serve como um registro completo do desenvolvimento e da arquitetura final implantada.
+Este documento detalha a concepção, implementação e configuração de uma infraestrutura robusta e segura na Amazon Web Services (AWS) utilizando Terraform. O objetivo principal é hospedar uma aplicação web moderna, composta por um frontend (Next.js) e um backend (API FastAPI com PostgreSQL), em múltiplos ambientes (ex: Desenvolvimento, Produção). A infraestrutura foi projetada com foco em segurança, alta disponibilidade, monitoramento e automação, incorporando ferramentas como Wazuh para detecção de intrusão (IDS/HIDS), um Application Load Balancer (ALB) para distribuição de tráfego e acesso via DNS, e um pipeline de CI/CD utilizando GitHub Actions para automação de deploy. Esta documentação serve como um registro completo do desenvolvimento e da arquitetura final implantada.
 
 ## 2. Configuração Inicial do Ambiente AWS e Desenvolvimento
 
@@ -14,7 +14,7 @@ O Terraform foi instalado no ambiente de desenvolvimento local para permitir a d
 
 ## 3. Estrutura do Projeto Terraform (`INFRA-PROJETO-AWS`)
 
-O projeto foi estruturado de forma modular para promover a clareza, reutilização e manutenibilidade.
+O projeto Terraform foi organizado de forma modular para promover a reutilização e a clareza, e preparado para gerenciar múltiplos ambientes.
 
 ### 3.1. Visão Geral da Estrutura de Arquivos
 
@@ -34,16 +34,16 @@ INFRA-PROJETO-AWS/
 │       └── variables.tf
 ├── main.tf                    # Configuração principal do módulo raiz (orquestração)
 ├── variables.tf               # Declaração de variáveis de entrada globais do projeto
-├── terraform.tfvars           # Valores específicos para as variáveis de entrada
+├── terraform.tfvars           # Valores padrão ou para o workspace 'default'
+├── dev.tfvars                 # Valores específicos para o ambiente de Desenvolvimento
+├── prod.tfvars                # Valores específicos para o ambiente de Produção (exemplo)
 ├── outputs.tf                 # Saídas globais do projeto (ex: DNS do ALB, IPs)
 ├── provider.tf                # Configuração do provedor AWS
 ├── database_app.tf            # Configuração do RDS para a aplicação e Secrets Manager
-├── database_zabbix.tf         # Configuração do RDS para o Zabbix e Secrets Manager (se Zabbix usar RDS)
 ├── load_balancer.tf           # Configuração do Application Load Balancer
 ├── user_data_frontend.sh      # Script de inicialização para instâncias frontend
 ├── user_data_backend.sh       # Script de inicialização para instâncias backend
-├── user_data_wazuh_server.sh  # Script de inicialização para o servidor Wazuh
-└── user_data_zabbix_server.sh # Script de inicialização para o servidor Zabbix
+└── user_data_wazuh_server.sh # Script de inicialização para o servidor Wazuh
 
 
 ### 4. Componentes da Infraestrutura e Decisões de Design
