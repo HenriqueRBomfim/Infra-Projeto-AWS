@@ -41,8 +41,13 @@ jobs:
 
       - name: Terraform Plan
         run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            VAR_FILE="terraform.tfvars"
+          else
+            VAR_FILE="${{ github.ref_name }}.tfvars"
+          fi
           terraform workspace select ${{ github.ref_name }} || terraform workspace new ${{ github.ref_name }}
-          terraform plan -var-file="${{ github.ref_name }}.tfvars" -out=tfplan
+          terraform plan -var-file="$VAR_FILE" -out=tfplan
 
       # Descomente o bloco abaixo para aplicar automaticamente no push para main/prod (use com cuidado!)
       # - name: Terraform Apply
