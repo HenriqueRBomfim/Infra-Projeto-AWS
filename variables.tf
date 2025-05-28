@@ -73,7 +73,7 @@ variable "backend_repo_url" {
 variable "backend_repo_branch" {
   description = "A branch do repositório backend a ser clonada na instância EC2"
   type        = string
-  default     = "main" 
+  default     = "main"
 }
 
 variable "backend_app_port" {

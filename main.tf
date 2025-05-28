@@ -12,7 +12,7 @@ module "security" {
   vpc_id           = module.vpc.vpc_id
   environment      = var.environment
   backend_app_port = var.backend_app_port
-  my_home_ip_cidr  = var.my_home_ip_cidr 
+  my_home_ip_cidr  = var.my_home_ip_cidr
 }
 
 # Data source para obter o ID da conta AWS atual (necessário para construir ARNs de segredos)
@@ -55,7 +55,7 @@ resource "aws_iam_role_policy_attachment" "s3_read_only_policy_attach" {
 # 5. Anexar política para ler o segredo das credenciais do BD PostgreSQL
 data "aws_iam_policy_document" "read_db_postgres_secret_policy_doc" {
   statement {
-    actions   = ["secretsmanager:GetSecretValue"]
+    actions = ["secretsmanager:GetSecretValue"]
     # Assume que aws_secretsmanager_secret.db_credentials_postgres é definido em database_postgres.tf
     resources = [aws_secretsmanager_secret.db_credentials_postgres.arn]
     effect    = "Allow"
@@ -107,9 +107,9 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 data "template_file" "frontend_user_data" {
   template = file("${path.module}/user_data_frontend.sh")
   vars = {
-    frontend_repo_url     = var.frontend_repo_url
-    NEXTJS_PORT           = var.nextjs_port
-    WAZUH_SERVER_IP       = "10.0.1.30" #module.ec2_wazuh_server.private_ip 
+    frontend_repo_url = var.frontend_repo_url
+    NEXTJS_PORT       = var.nextjs_port
+    WAZUH_SERVER_IP   = "10.0.1.30" #module.ec2_wazuh_server.private_ip 
     aws_region        = var.region
   }
 }
@@ -117,14 +117,14 @@ data "template_file" "frontend_user_data" {
 data "template_file" "backend_user_data" {
   template = file("${path.module}/user_data_backend.sh")
   vars = {
-    backend_repo_url                  = var.backend_repo_url
+    backend_repo_url = var.backend_repo_url
     # APP_PORT foi o nome da chave que definimos antes para o script backend
-    APP_PORT                          = var.backend_app_port
-    aws_region                        = var.region
-    backend_repo_branch               = var.backend_repo_branch
+    APP_PORT                            = var.backend_app_port
+    aws_region                          = var.region
+    backend_repo_branch                 = var.backend_repo_branch
     db_credentials_secret_name_postgres = var.db_credentials_secret_name_postgres
-    github_ssh_key_secret_name        = var.github_ssh_key_secret_name
-    WAZUH_SERVER_IP                   = "10.0.1.30"  #module.ec2_wazuh_server.private_ip 
+    github_ssh_key_secret_name          = var.github_ssh_key_secret_name
+    WAZUH_SERVER_IP                     = "10.0.1.30" #module.ec2_wazuh_server.private_ip 
   }
 }
 
@@ -185,17 +185,17 @@ data "template_file" "user_data_wazuh_server" {
 module "ec2_wazuh_server" {
   source = "./modules/ec2" # Seu módulo EC2 existente
 
-  instance_name               = "${var.environment}-wazuh-server"
-  ami                         = var.ami_id # Pode usar o mesmo Ubuntu AMI
-  instance_type               = var.wazuh_server_instance_type
-  key_name                    = var.key_name # Mesmo par de chaves (para acesso via Session Manager, a chave não é usada ativamente)
-  root_volume_size            = var.wazuh_server_root_volume_size
-  subnet_id                   = module.vpc.public_subnet_ids[0]
-  security_group_ids          = [module.security.wazuh_server_sg_id] # Novo SG
-  user_data                   = data.template_file.user_data_wazuh_server.rendered
-  iam_instance_profile_name   = aws_iam_instance_profile.ec2_profile.name # Reutiliza o perfil existente
-                                                                         # A role 'ec2_role' já tem permissão para SSM.
-                                                                         # Se o Wazuh Server precisar de outras permissões AWS, considere uma role dedicada.
+  instance_name             = "${var.environment}-wazuh-server"
+  ami                       = var.ami_id # Pode usar o mesmo Ubuntu AMI
+  instance_type             = var.wazuh_server_instance_type
+  key_name                  = var.key_name # Mesmo par de chaves (para acesso via Session Manager, a chave não é usada ativamente)
+  root_volume_size          = var.wazuh_server_root_volume_size
+  subnet_id                 = module.vpc.public_subnet_ids[0]
+  security_group_ids        = [module.security.wazuh_server_sg_id] # Novo SG
+  user_data                 = data.template_file.user_data_wazuh_server.rendered
+  iam_instance_profile_name = aws_iam_instance_profile.ec2_profile.name # Reutiliza o perfil existente
+  # A role 'ec2_role' já tem permissão para SSM.
+  # Se o Wazuh Server precisar de outras permissões AWS, considere uma role dedicada.
   associate_public_ip_address = true # Para ter um IP público para acessar o dashboard
 
   tags = {

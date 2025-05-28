@@ -8,9 +8,9 @@ resource "aws_lb" "frontend_alb" {
   internal           = false # Voltado para a internet
   load_balancer_type = "application"
   # Este ID virá do output do seu módulo de segurança, após você adicionar o SG do ALB lá
-  security_groups    = [module.security.alb_sg_id]
+  security_groups = [module.security.alb_sg_id]
   # O ALB deve ser implantado nas suas subnets PÚBLICAS
-  subnets            = module.vpc.public_subnet_ids
+  subnets = module.vpc.public_subnet_ids
 
   enable_deletion_protection = false # Para desenvolvimento. Em produção, considere 'true'.
 
@@ -25,7 +25,7 @@ resource "aws_lb" "frontend_alb" {
 # Target Group para as Instâncias do Frontend
 # -----------------------------------------------------------------------------
 resource "aws_lb_target_group" "frontend_tg" {
-  name        = "${var.environment}-frontend-tg"
+  name = "${var.environment}-frontend-tg"
   # Porta em que suas instâncias frontend (o Nginx nelas) estão escutando.
   # Se o Nginx na instância EC2 escuta na porta 80 (e faz proxy para o Next.js na porta 3000),
   # então use 80 aqui.

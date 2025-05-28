@@ -52,9 +52,9 @@ resource "aws_db_instance" "postgres_default" {
   vpc_security_group_ids = [aws_security_group.rds_postgres_sg.id]
   parameter_group_name   = "default.postgres${split(".", var.db_engine_version_postgres)[0]}"
 
-  skip_final_snapshot    = true  # Para dev/test. Em produção, defina como false.
-  publicly_accessible    = false # Importante para segurança
-  storage_encrypted      = true  # Recomendado
+  skip_final_snapshot = true  # Para dev/test. Em produção, defina como false.
+  publicly_accessible = false # Importante para segurança
+  storage_encrypted   = true  # Recomendado
   # backup_retention_period = 0  # Considere para Free Tier se necessário.
 
   tags = {
@@ -73,7 +73,7 @@ resource "aws_secretsmanager_secret" "db_credentials_postgres" {
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials_postgres_version" {
-  secret_id     = aws_secretsmanager_secret.db_credentials_postgres.id
+  secret_id = aws_secretsmanager_secret.db_credentials_postgres.id
   secret_string = jsonencode({
     username             = aws_db_instance.postgres_default.username
     password             = aws_db_instance.postgres_default.password # Referenciar a senha da instância é ok, pois ela obtém do random_password.
