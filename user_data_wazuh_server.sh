@@ -1,11 +1,10 @@
 #!/bin/bash
 # user_data_wazuh_server.sh
-exec > >(tee /tmp/user-data-wazuh.log|logger -t user-data -s 2>/dev/console) 2>&1
-
-echo ">>> Iniciando user_data_wazuh_server.sh para instalação do Wazuh Server (all-in-one) - Versão Atual"
+LOG_FILE="/tmp/user-data-wazuh-installation.log" 
+exec > >(tee -a "$LOG_FILE" | logger -t user-data -s 2>/dev/console) 2>&1
 
 echo ">>> Baixando o script de instalação do Wazuh (wazuh-install.sh)..."
-curl -sO https://packages.wazuh.com/wazuh-install.sh # URL para a versão "current"
+curl -sO https://packages.wazuh.com/4.12/wazuh-install.sh
 
 if [ -f ./wazuh-install.sh ]; then
   echo ">>> Script de instalação 'wazuh-install.sh' baixado com sucesso."

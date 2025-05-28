@@ -22,7 +22,8 @@ SSH_CONFIG_FILE="$SSH_DIR/config"
 
 echo ">>> Atualizando pacotes e instalando dependências base"
 sudo apt update -y
-sudo apt install -y git python3 python3-pip python3-venv jq openssh-client
+# Adicionando awscli à lista de pacotes a serem instalados
+sudo apt install -y git python3 python3-pip python3-venv jq openssh-client awscli # <--- AWS CLI ADICIONADO AQUI
 
 echo ">>> Configurando chave SSH para clone do GitHub via Deploy Key"
 sudo mkdir -p "$SSH_DIR"
@@ -30,6 +31,7 @@ sudo chmod 700 "$SSH_DIR"
 
 if [ -n "$GITHUB_SSH_KEY_SECRET_NAME_SHELL" ]; then
   echo ">>> Buscando chave privada SSH do GitHub Deploy Key do Secrets Manager: $GITHUB_SSH_KEY_SECRET_NAME_SHELL em $AWS_REGION_FOR_CLI"
+  # Agora o comando 'aws' deve estar disponível
   GITHUB_PRIVATE_KEY=$(aws secretsmanager get-secret-value --secret-id "$GITHUB_SSH_KEY_SECRET_NAME_SHELL" --query SecretString --output text --region "$AWS_REGION_FOR_CLI")
 
   if [ $? -eq 0 ] && [ -n "$GITHUB_PRIVATE_KEY" ]; then
@@ -115,15 +117,15 @@ fi
 # --- INÍCIO: Instalação do Agente Wazuh ---
 if [ -n "$WAZUH_SERVER_IP_SHELL" ]; then
   echo ">>> Instalando e configurando Agente Wazuh para conectar em $WAZUH_SERVER_IP_SHELL"
-  # Comandos para Ubuntu (VERIFIQUE A DOCUMENTAÇÃO OFICIAL DO WAZUH para a versão 4.1.x)
-  echo ">>> Adicionando chave GPG e repositório Wazuh 4.1.x..."
+  # Comandos para Ubuntu
+  echo ">>> Adicionando chave GPG e repositório Wazuh..." # Removido 4.1.x para usar o do frontend que é 4.x genérico
   curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | sudo apt-key add -
   echo "deb https://packages.wazuh.com/4.x/apt/ stable main" | sudo tee /etc/apt/sources.list.d/wazuh.list
   
   echo ">>> Atualizando pacotes e instalando o wazuh-agent..."
-  sudo apt-get update
+  sudo apt-get update # Pode ser redundante se o de cima já fez, mas não prejudica.
   # A variável WAZUH_MANAGER configura o IP do servidor durante a instalação do agente
-  sudo WAZUH_MANAGER="$WAZUH_SERVER_IP_SHELL" apt-get install -y wazuh-agent # Para 4.1.x, confirme se esta é a forma de especificar a versão ou se pega do repo.
+  sudo WAZUH_MANAGER="$WAZUH_SERVER_IP_SHELL" apt-get install -y wazuh-agent
 
   echo ">>> Habilitando e iniciando o serviço wazuh-agent..."
   sudo systemctl daemon-reload
@@ -140,6 +142,7 @@ if [ -f "$DB_ENV_FILE" ]; then
   # Garante que as variáveis do .env estão disponíveis para o processo do Alembic
   export $(grep -v '^#' "$DB_ENV_FILE" | xargs -d '\n')
 fi
+# Certifique-se de que o APP_DIR está correto e que alembic.ini está lá
 sudo "$VENV_DIR/bin/alembic" -c "$APP_DIR/alembic.ini" upgrade head
 
 echo ">>> Iniciando aplicação FastAPI com Gunicorn/Uvicorn na porta $APP_SHELL_PORT" 

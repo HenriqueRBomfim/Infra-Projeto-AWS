@@ -3,15 +3,23 @@ resource "aws_instance" "app_instance" {
   instance_type               = var.instance_type
   key_name                    = var.key_name
   subnet_id                   = var.subnet_id
-  vpc_security_group_ids      = var.security_group_ids # Usa os SGs passados como variável
-  user_data                   = var.user_data          
-  iam_instance_profile        = var.iam_instance_profile_name # Para a IAM Role
+  vpc_security_group_ids      = var.security_group_ids
+  user_data                   = var.user_data
+  iam_instance_profile        = var.iam_instance_profile_name
   associate_public_ip_address = var.associate_public_ip_address
+
+  root_block_device {
+    volume_size = var.root_volume_size
+
+    volume_type = "gp3"
+
+    delete_on_termination = true
+  }
 
   tags = merge(
     {
-      Name = var.instance_name # O nome principal da instância
+      Name = var.instance_name
     },
-    var.tags # Permite adicionar tags customizadas passadas pelo módulo raiz
+    var.tags
   )
 }

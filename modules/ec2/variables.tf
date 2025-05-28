@@ -57,3 +57,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "root_volume_size" {
+  description = "Tamanho do volume EBS raiz em GB. Deixe null para usar o padrão da AMI."
+  type        = number
+  default     = null
+}

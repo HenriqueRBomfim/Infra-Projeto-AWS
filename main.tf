@@ -109,7 +109,7 @@ data "template_file" "frontend_user_data" {
   vars = {
     frontend_repo_url     = var.frontend_repo_url
     NEXTJS_PORT           = var.nextjs_port
-    WAZUH_SERVER_IP       = module.ec2_wazuh_server.private_ip 
+    WAZUH_SERVER_IP       = "10.0.1.30" #module.ec2_wazuh_server.private_ip 
     aws_region        = var.region
   }
 }
@@ -124,7 +124,7 @@ data "template_file" "backend_user_data" {
     backend_repo_branch               = var.backend_repo_branch
     db_credentials_secret_name_postgres = var.db_credentials_secret_name_postgres
     github_ssh_key_secret_name        = var.github_ssh_key_secret_name
-    WAZUH_SERVER_IP                   = module.ec2_wazuh_server.private_ip
+    WAZUH_SERVER_IP                   = "10.0.1.30"  #module.ec2_wazuh_server.private_ip 
   }
 }
 
@@ -189,7 +189,7 @@ module "ec2_wazuh_server" {
   ami                         = var.ami_id # Pode usar o mesmo Ubuntu AMI
   instance_type               = var.wazuh_server_instance_type
   key_name                    = var.key_name # Mesmo par de chaves (para acesso via Session Manager, a chave não é usada ativamente)
-  # Colocar em subnet pública para acesso ao dashboard (restringido pelo SG ao seu IP)
+  root_volume_size            = var.wazuh_server_root_volume_size
   subnet_id                   = module.vpc.public_subnet_ids[0]
   security_group_ids          = [module.security.wazuh_server_sg_id] # Novo SG
   user_data                   = data.template_file.user_data_wazuh_server.rendered

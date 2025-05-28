@@ -79,7 +79,7 @@ variable "backend_repo_branch" {
 variable "backend_app_port" {
   description = "Port the backend application listens on (for Security Group)"
   type        = number
-  default     = 8000 # Ajustado para o valor que você está usando no tfvars
+  default     = 8000
 }
 
 variable "db_name_postgres" {
@@ -132,10 +132,16 @@ variable "nextjs_port" {
 variable "wazuh_server_instance_type" {
   description = "O tipo de instância EC2 para o servidor Wazuh (ex: t3.medium)"
   type        = string
-  default     = "t3.medium"
+  default     = "t3.large"
 }
 
 variable "my_home_ip_cidr" {
   description = "Seu endereço IP público em formato CIDR para acesso restrito aos dashboards (ex: SEU_IP/32)"
   type        = list(string)
+}
+
+variable "wazuh_server_root_volume_size" {
+  description = "Tamanho do volume EBS raiz para o servidor Wazuh em GB"
+  type        = number
+  default     = 50
 }

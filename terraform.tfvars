@@ -27,8 +27,9 @@ github_ssh_key_secret_name        = "dev/github/backend_deploy_key_private"
 nextjs_port                       = 3000 # Porta interna do Next.js que o Nginx fará proxy.
                                          # Se o default 3000 em variables.tf já é o desejado, esta linha é opcional.
 
-wazuh_server_instance_type = "t3.medium" # Ou "t3.large", dependendo da carga esperada.
+wazuh_server_instance_type = "t3.large" # Ou "t3.large", dependendo da carga esperada.
                                          # Verifique a documentação do Wazuh para recomendações.
+wazuh_server_root_volume_size = 50 
 
 # Se adicionou my_home_ip_cidr em variables.tf:
-my_home_ip_cidr            = ["186.232.61.64/32"]                                      
+my_home_ip_cidr            = ["186.232.61.63/32"]                                      
