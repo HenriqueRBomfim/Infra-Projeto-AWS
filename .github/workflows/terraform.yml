@@ -1,0 +1,50 @@
+name: Terraform CI/CD
+
+on:
+  push:
+    branches: [ main, dev, prod ]
+  pull_request:
+    branches: [ main, dev, prod ]
+
+env:
+  TF_VERSION: "1.12.1"
+  AWS_REGION: "us-east-2"
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Inicializar Terraform
+        run: terraform init
+
+      - name: Validar Terraform
+        run: terraform validate
+
+      - name: Checar formatação
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        run: |
+          terraform workspace select ${{ github.ref_name }} || terraform workspace new ${{ github.ref_name }}
+          terraform plan -var-file="${{ github.ref_name }}.tfvars" -out=tfplan
+
+      # Descomente o bloco abaixo para aplicar automaticamente no push para main/prod (use com cuidado!)
+      # - name: Terraform Apply
+      #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/prod'
+      #   run: terraform apply -auto-approve tfplan
